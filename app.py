@@ -187,9 +187,11 @@ def download_video():
         })
 
 
+# Load config from service on module import (for gunicorn)
+load_config_from_service()
+logger.info(f"MinIO endpoint: {MINIO_ENDPOINT or '(not set)'}")
+
 if __name__ == "__main__":
-    load_config_from_service()
     port = int(os.environ.get("PORT", "8000"))
     logger.info(f"Starting yt-dlp service on port {port}")
-    logger.info(f"MinIO endpoint: {MINIO_ENDPOINT or '(not set)'}")
     app.run(host="0.0.0.0", port=port)
