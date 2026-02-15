@@ -116,6 +116,7 @@ def download_video():
             "yt-dlp",
             "--no-playlist",
             "--js-runtimes", "node",
+            "--extractor-args", "youtube:player_client=mediaconnect",
             "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
             "--merge-output-format", "mp4",
             "-o", output_path,
