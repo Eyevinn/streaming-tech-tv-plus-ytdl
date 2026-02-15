@@ -25,6 +25,7 @@ MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "")
 MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "")
 MINIO_BUCKET = os.environ.get("MINIO_BUCKET", "source")
 API_SECRET = os.environ.get("API_SECRET", "")
+YOUTUBE_COOKIES = os.environ.get("YOUTUBE_COOKIES", "")
 
 # Optional: load config from App Config Service
 CONFIG_SERVICE_URL = os.environ.get("APP_CONFIG_URL", "")
@@ -32,7 +33,7 @@ CONFIG_SERVICE_URL = os.environ.get("APP_CONFIG_URL", "")
 
 def load_config_from_service():
     """Load configuration from App Config Service if available."""
-    global MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, API_SECRET
+    global MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, API_SECRET, YOUTUBE_COOKIES
     if not CONFIG_SERVICE_URL:
         return
 
@@ -43,6 +44,7 @@ def load_config_from_service():
         "MINIO_ACCESS_KEY": "MINIO_ACCESS_KEY",
         "MINIO_SECRET_KEY": "MINIO_SECRET_KEY",
         "YT_DLP_API_SECRET": "API_SECRET",
+        "YOUTUBE_COOKIES": "YOUTUBE_COOKIES",
     }
     for config_key, var_name in keys.items():
         try:
@@ -71,7 +73,11 @@ def get_s3_client():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "hasCookies": bool(YOUTUBE_COOKIES),
+        "hasMinIO": bool(MINIO_ENDPOINT),
+    })
 
 
 @app.route("/api/download", methods=["POST"])
@@ -117,15 +123,24 @@ def download_video():
             "--no-playlist",
             "--js-runtimes", "node",
             "--force-ipv4",
-            "--extractor-args", "youtube:player_client=web_music,web",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
             "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
             "--merge-output-format", "mp4",
             "-o", output_path,
             "--no-progress",
             "--print-json",
-            url,
         ]
+
+        # Add cookies if available (needed to bypass YouTube bot detection)
+        cookies_content = data.get("cookies") or YOUTUBE_COOKIES
+        cookies_file = None
+        if cookies_content:
+            cookies_file = os.path.join(tmpdir, "cookies.txt")
+            with open(cookies_file, "w") as f:
+                f.write(cookies_content)
+            cmd.extend(["--cookies", cookies_file])
+            logger.info("Using provided cookies for authentication")
+
+        cmd.append(url)
 
         logger.info(f"Running: {' '.join(cmd)}")
 
